@@ -6,14 +6,13 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 
 from presidio_analyzer import AnalyzerEngine
 from presidio_anonymizer import AnonymizerEngine
-from transformers import pipeline
 
 app = FastAPI(title="LLM-Guard", version="1.0")
 
 apikey = os.getenv("apikey", "ollama_local")
 apiurl = os.getenv("apiurl", "http://localhost:11434/v1/chat/completions")
 
-# Initialize Presidio
+# Initialize engines
 analyzer = AnalyzerEngine()
 anonymizer = AnonymizerEngine()
 
@@ -46,9 +45,9 @@ async def chat_completions_proxy(request: Request):
             if "content" in message and isinstance(message["content"], str):
                 original_text = message["content"]
 
-                safe_text = clear_pii(original_text)
+                safe_text = clear_pii(original_text) # Redact PII
 
-                print(f"\nRaw Prompt:      {original_text}") # Prompt Logging
+                print(f"\nRaw Prompt:      {original_text}") # Log it
                 print(f"Redacted Prompt: {safe_text}\n") 
                 
                 message["content"] = safe_text  # Overwrite
