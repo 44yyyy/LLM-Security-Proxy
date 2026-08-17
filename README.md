@@ -16,4 +16,9 @@ The very first thing that I needed was a way to intercept the traffic for analys
 
 I learned that standard LLM APIs like OpenAI or Ollama format conversations as a JSON payload containing a messages array where each entry holds a role (user/assistant) and the raw content (prompt). The proxy needed to intercept this incoming payload, iterate through the array to extract and sanitize the prompt, and finally, reconstruct the safe payload before forwarding it to the LLM."
 
-Payloads were being intercepted before they could reach the untrusted LLM environment. 
+Payloads were being intercepted before they could reach the untrusted LLM environment.
+
+## 2. Implementing Data Loss Prevention (DLP)
+For the main security feature of the project, I decided to integrate Microsoft Presidio and spaCy's Named Entity Recognition (NER) models to analyze the text and implement DLP.
+
+Instead of relying on regex, which could easily be bypassed or be prone to errors, the NER model understands the context of the prompt. I wrote a `clear_pii` function that scans the prompt, identifies PII entities like `CREDIT_CARD`, `EMAIL_ADDRESS`, and `US_SSN`, and replaces them with safe placeholders.
