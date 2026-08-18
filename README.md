@@ -21,4 +21,26 @@ Payloads were being intercepted before they could reach the untrusted LLM enviro
 ## 2. Implementing Data Loss Prevention (DLP)
 For the main security feature of the project, I decided to integrate Microsoft Presidio and spaCy's Named Entity Recognition (NER) models to analyze the text and implement DLP.
 
-Instead of relying on regex, which could easily be bypassed or be prone to errors, the NER model understands the context of the prompt. I wrote a `clear_pii` function that scans the prompt, identifies PII entities like `CREDIT_CARD`, `EMAIL_ADDRESS`, and `US_SSN`, and replaces them with safe placeholders.
+Instead of relying on regex, which could easily be bypassed or be prone to errors, the NER model understands the context of the prompt. I wrote a `clear_pii` function that scans the prompt, identifies PII entities like credit card numbers, email addresses, social security numbers, and replaces them with safe placeholders. 
+
+Here is a demonstration:
+
+**cURL Request:** `curl -X POST http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "llama3.2:1b",
+    "messages": [
+      { 
+        "role": "user", 
+        "content": "Hi! Please update my information. My email is john.doe@company.com, and my credit card number is 4111-1111-1111-1111."     
+      }
+    ]
+  }'`
+
+![1](Screenshots/1.jpg)
+
+The POST request is intercepted, with the PII inside the prompt being redacted.
+
+![2](Screenshots/2.jpg)
+
+After the filter was applied to the prompt, the request is completed, with the AI response now being returned to us.
