@@ -16,8 +16,6 @@ The very first thing that I needed was a way to intercept the traffic for analys
 
 I learned that standard LLM APIs like OpenAI or Ollama format conversations as a JSON payload containing a messages array where each entry holds a role (user/assistant) and the raw content (prompt). The proxy needed to intercept this incoming payload, iterate through the array to extract and sanitize the prompt, and finally, reconstruct the safe payload before forwarding it to the LLM."
 
-Payloads were being intercepted before they could reach the untrusted LLM environment.
-
 ## 2. Implementing Data Loss Prevention (DLP)
 For the main security feature of the project, I decided to integrate Microsoft Presidio and spaCy's Named Entity Recognition (NER) models to analyze the text and implement DLP.
 
@@ -46,7 +44,7 @@ The POST request is intercepted, with the PII inside the prompt being redacted.
 After the filter was applied to the prompt, the request is completed, with the AI response now being returned to us.
 
 ## 3. Prompt Injection (Algorithmic Bias)
-As an additional feature, I attempted to implement a prompt injection blocker. To do this, I used a lightweight Hugging Face model (`protectai/deberta-v3-base-prompt-injection-v2`) to analyze incoming text and drop malicious jailbreaks. The function ```is_prompt_inject``` (description) evaluated the input and dropped the payload with a 403 Forbidden error if the model flagged it with a high confidence score.
+As an additional feature, I attempted to implement a prompt injection blocker. To do this, I used the `protectai/deberta-v3-base-prompt-injection-v2` model to analyze incoming text and drop malicious prompt injection attempts. The function ```is_prompt_inject``` evaluates the input and drops a payload with a 403 Forbidden error if the model flagged it malicious with a high confidence score.
 
 **Setup:**
 
@@ -57,7 +55,7 @@ As an additional feature, I attempted to implement a prompt injection blocker. T
 ![4](Screenshots/4.jpg)
 
 **The Problem:**
-While testing, I encountered a massive false-positive issue. When I sent a prompt containing PII, I intended it to pass the prompt injection check and then be processed by `clear_pii`. However, the classifier flagged it as a malicious injection with 99.8% confidence and blocked the request. A another test without PII passed perfectly. 
+While testing, I encountered a massive false-positive issue. When I sent a prompt containing PII, I intended it to pass the prompt injection check and then be processed by `clear_pii`. However, the classifier flagged it as a malicious injection with 99.8% confidence and blocked the request. Tests without PII were passing perfectly. 
 
 Here is a demonstration:
 
@@ -74,7 +72,7 @@ Here is a demonstration:
 
 When sent, we can see that the client received the prompt injection detection string, and the server logged the raw prompt, flagged the injection, and returned a 403 Forbidden status code.
 
-When I saw this behavior, my first thought was to reorder the pipeline to run `clear_pii` on the prompt before it goes into `is_prompt_inject`. It could have been the case that the DeBERTa model was trained on thousands of hacking attempts and learned to associated structured data (16 digit numbers, IPs, @ symbols) with data exfiltration of SQLi attempts. The model probably lacked the reasoning to understand that I was just providing standard profile data. Here's what happened after my first modifications:
+When I saw this behavior, my first thought was to reorder the pipeline to run `clear_pii` on the prompt before it goes into `is_prompt_inject`. It could have been the case that the DeBERTa model was trained on thousands of hacking attempts and learned to associated structured data (16 digit numbers, IPs, @ symbols) with data exfiltration or SQLi attempts. The model probably lacked the reasoning to understand that I was just providing standard profile data. Here's what happened after my first modifications:
 
 ### Fix #1
 
@@ -95,7 +93,7 @@ To work around this problem, I scanned the prompt for these scary looking tags a
 
 ### Fix #2
 
-**Revised Pipeline:**
+**Revised Pipeline (Replacing Tags):**
 
 ![11](Screenshots/11.jpg)
 
@@ -106,12 +104,26 @@ To work around this problem, I scanned the prompt for these scary looking tags a
 ![12](Screenshots/13.jpg)
 ![13](Screenshots/12.jpg)
 
-We see the change reflected from the server side output, where the normalized prompt is printed. But still, the behavior was the same. At this point, I was stumped. With my current attainable skillset, I couldn't find a way to resolve the false positive issue of the DeBERTa model.
+We see the change reflected from the server side output, where the normalized prompt is printed. But still, the behavior was the same. At this point, I was stumped. With my current attainable skill set, I couldn't find a way to resolve the false positive issue of the DeBERTa model.
 
-After considering my next steps for a while, I decided to remove the prompt injection detecting functionality from the project. I could have spent days going down the machine learning rabbit hole and fine-tuning the model using a custom dataset, but at that point, the core focus of the project would shift greatly.
+After considering my next steps for a while, I decided to remove the prompt injection detecting functionality from the project. I could have spent days going down the machine learning rabbit hole and fine-tuning the model using a custom dataset, but at that point, the core focus of the project would be lost.
 
 Although it was frustrating, the chain of problems that I faced here and my process of trying to fix it highlighted why building reliable security tools is so difficult. In Enterprise settings, if a tool introduces too much technical debt and causes too much friction with legitimate business operations, it is a failed tool and should not be integrated.
 
 ## Conclusion
 
-I believed for a while that AI/LLM concepts were not yet well integrated with traditional learning paths in cybersecurity, and always felt a bit frustrated not clearly understanding these concepts and how exactly they fit into security. Building this project resolved that frustration for me, and it was extremely satisfying seeing how AI/LLM and security connected at a conceptual and technical level. At the beginning of the project, I did not expect to spend most of my time dealing with a model that was absolutely convinced that "email address" and "credit card" was a hacking attempt, but I really enjoyed trying to troubleshoot and revise my original idea to make it work (and a lot of my future work will be unpredictable!). This also gave me a peek the complexities that come with integrating machine learning into security pipelines. Securing AI is a relatively new domain and will become more and more important as we officially get settled into the "age of AI," so this project was especially valuable to me, as it was my first introduction to it.
+I believed for a while that AI/LLM concepts were not yet well integrated with traditional learning paths in cybersecurity, and always felt a bit frustrated not clearly understanding these concepts and how exactly they fit into security. Building this project resolved that frustration for me, and it was extremely satisfying seeing how AI/LLM and security connected at a conceptual and technical level. At the beginning of the project, I did not expect to spend most of my time dealing with a model that was absolutely convinced that "email address" and "credit card" was a hacking attempt, but I really enjoyed trying to troubleshoot and revise my original idea to make it work (and a lot of my future work will be unpredictable!). This also gave me a peek into the complexities that come with integrating machine learning into security pipelines. Securing AI is a relatively new domain and will become increasingly important as we officially get settled into the "age of AI," so this project was especially valuable to me, as it was my first introduction to it.
+
+### Key Concepts Learned
+*   **Asynchronous I/O:** Using FastAPI and `httpx` to route HTTP requests without blocking the main server thread while waiting for the LLM to generate a response.
+*   **Named Entity Recognition (NER):** Using spaCy and Microsoft Presidio to detect and redact PII based on sentence syntax.
+*   **LLM Diagnostics:** Identifying how dataset biases and string formatting (like HTML/XML tags) trigger false positives in text classification models.
+*   **Payload Processing:** Controlling the step-by-step processing of incoming JSON payloads and dropping features that introduce too much technical debt.
+*   
+## Contact
+
+Email: <johnyang4406@gmail.com>, <john_s_yang@brown.edu>
+
+LinkedIn: <https://www.linkedin.com/in/john-yang-747726292/>
+
+HackTheBox: <https://profile.hackthebox.com/profile/019c423f-9b9b-708f-8b31-55983b89dddd?utm_medium=copy_url/>
