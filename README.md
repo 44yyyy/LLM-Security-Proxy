@@ -105,3 +105,13 @@ To work around this problem, I scanned the prompt for these scary looking tags a
 
 ![12](Screenshots/13.jpg)
 ![13](Screenshots/12.jpg)
+
+We see the change reflected from the server side output, where the normalized prompt is printed. But still, the behavior was the same. At this point, I was stumped. With my current attainable skillset, I couldn't find a way to resolve the false positive issue of the DeBERTa model.
+
+After considering my next steps for a while, I decided to remove the prompt injection detecting functionality from the project. I could have spent days going down the machine learning rabbit hole and fine-tuning the model using a custom dataset, but at that point, the core focus of the project would shift greatly.
+
+Although it was frustrating, the chain of problems that I faced here and my process of trying to fix it highlighted why building reliable security tools is so difficult. In Enterprise settings, if a tool introduces too much technical debt and causes too much friction with legitimate business operations, it is a failed tool and should not be integrated.
+
+## Conclusion
+
+I believed for a while that AI/LLM concepts were not yet well integrated with traditional learning paths in cybersecurity, and always felt a bit frustrated not clearly understanding these concepts and how exactly they fit into security. Building this project resolved that frustration for me, and it was extremely satisfying seeing how AI/LLM and security connected at a conceptual and technical level. At the beginning of the project, I did not expect to spend most of my time dealing with a model that was absolutely convinced that "email address" and "credit card" was a hacking attempt, but I really enjoyed trying to troubleshoot and revise my original idea to make it work (and a lot of my future work will be unpredictable!). This also gave me a peek the complexities that come with integrating machine learning into security pipelines. Securing AI is a relatively new domain and will become more and more important as we officially get settled into the "age of AI," so this project was especially valuable to me, as it was my first introduction to it.
