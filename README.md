@@ -25,7 +25,7 @@ Instead of relying on regex, which could easily be bypassed or be prone to error
 
 Here is a demonstration:
 
-**cURL Request:** `curl -X POST http://localhost:8000/v1/chat/completions \
+**The Prompt (sent through a cURL request):** `curl -X POST http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "llama3.2:1b",
@@ -44,3 +44,64 @@ The POST request is intercepted, with the PII inside the prompt being redacted.
 ![2](Screenshots/2.jpg)
 
 After the filter was applied to the prompt, the request is completed, with the AI response now being returned to us.
+
+## 3. Prompt Injection (Algorithmic Bias)
+As an additional feature, I attempted to implement a prompt injection blocker. To do this, I used a lightweight Hugging Face model (`protectai/deberta-v3-base-prompt-injection-v2`) to analyze incoming text and drop malicious jailbreaks. The function ```is_prompt_inject``` (description) evaluated the input and dropped the payload with a 403 Forbidden error if the model flagged it with a high confidence score.
+
+**Setup:**
+
+![3](Screenshots/3.jpg)
+
+**Function (```is_prompt_inject```):**
+
+![4](Screenshots/4.jpg)
+
+**The Problem:**
+While testing, I encountered a massive false-positive issue. When I sent a prompt containing PII, I intended it to pass the prompt injection check and then be processed by `clear_pii`. However, the classifier flagged it as a malicious injection with 99.8% confidence and blocked the request. A another test without PII passed perfectly. 
+
+Here is a demonstration:
+
+**Original Pipeline:**
+
+![5](Screenshots/5.jpg)
+
+**Prompt:** The prompt and curl request remains exactly the same as the example above.
+
+**Results:**
+
+![6](Screenshots/8.jpg)
+![7](Screenshots/7.jpg)
+
+When sent, we can see that the client received the prompt injection detection string, and the server logged the raw prompt, flagged the injection, and returned a 403 Forbidden status code.
+
+When I saw this behavior, my first thought was to reorder the pipeline to run `clear_pii` on the prompt before it goes into `is_prompt_inject`. It could have been the case that the DeBERTa model was trained on thousands of hacking attempts and learned to associated structured data (16 digit numbers, IPs, @ symbols) with data exfiltration of SQLi attempts. The model probably lacked the reasoning to understand that I was just providing standard profile data. Here's what happened after my first modifications:
+
+### Fix #1
+
+**Revised Pipeline (`clear_pii` first):**
+
+![8](Screenshots/6.jpg)
+
+**Prompt:** The prompt and curl request remains exactly the same as the example above.
+
+**Results:**
+
+![9](Screenshots/10.jpg)
+![10](Screenshots/9.jpg)
+
+Here, we see the change reflected from the redacted prompt being printed on the server side. However, the behavior was the same after the clean prompt was processed by ```is_prompt_inject```. This was frustrating, but I deduced that the injection classifier could be flagging the formatting of the sanitization done by Presidio. As we see with the output of the clean prompts, Presidio replaces PII with bracketed tags like <CREDIT_CARD>. This format, with HTML-like tags and all-caps, resemble techniques used for code execution (XSS, XXE, etc).
+
+To work around this problem, I scanned the prompt for these scary looking tags and replaced them with natural English strings by using Python's `.replace()` method, and defined the new `final_text` variable which stored the final, normalized prompt.
+
+### Fix #2
+
+**Revised Pipeline:**
+
+![11](Screenshots/11.jpg)
+
+**Prompt:** The prompt and curl request remains exactly the same as the example above.
+
+**Results:**
+
+![12](Screenshots/13.jpg)
+![13](Screenshots/12.jpg)
