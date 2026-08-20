@@ -11,6 +11,64 @@ My main objective was to build a zero-trust asynchronous proxy that sits between
 *   **Machine Learning/NLP:** Microsoft Presidio, spaCy NER (Named Entity Recognition)
 *   **Environment:** REST APIs, Local LLM Integration (Ollama / LLaMA 3.2)
 
+## Reproduction Steps
+
+### Prerequisites
+*   **Python 3.10+** installed on your machine.
+*   **Ollama** installed and running locally.
+*   Pull a lightweight local LLM (e.g., LLaMA 3.2): 
+    ```bash
+    ollama run llama3.2:1b
+    ```
+
+### Installation
+1. **Clone repo and navigate into it:**
+    ```bash
+    git clone [https://github.com/<username>/<repo_name>.git](https://github.com/<username>/<repo_name.git)
+    cd <repo_name>
+    ```
+
+2. **Create and activate a virtual environment:**
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # Windows: venv\Scripts\activate
+    ```
+
+3. **Install dependencies:**
+    ```bash
+    pip install fastapi uvicorn httpx presidio-analyzer presidio-anonymizer spacy
+    ```
+
+4. **Download the spaCy NLP model (Required forPresidio to detect PII):**
+    ```bash
+    python -m spacy download en_core_web_lg
+    ```
+
+### Running the Proxy
+Start the FastAPI server using Uvicorn. By default, it will run on port 8000.
+```bash
+uvicorn main:app --reload
+```
+
+### Testing
+With both Ollama and the FastAPI proxy running, send a POST request to the proxy. You can use this `curl` command:
+
+```bash
+curl -X POST http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "llama3.2:1b",
+    "messages": [
+      { 
+        "role": "user", 
+        "content": "<message>"      
+      }
+    ]
+  }'
+```
+
+## Documentation
+
 ## 1. Asynchronous Proxy
 The very first thing that I needed was a way to intercept the traffic for analysis. I decided to build a reverse proxy using FastAPI. 
 
@@ -23,17 +81,21 @@ Instead of relying on regex, which could easily be bypassed or be prone to error
 
 Here is a demonstration:
 
-**The Prompt (sent through a cURL request):** `curl -X POST http://localhost:8000/v1/chat/completions \
+**The Prompt (sent through a cURL request):**
+
+```bash
+curl -X POST http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "llama3.2:1b",
     "messages": [
       { 
         "role": "user", 
-        "content": "Hi! Please update my information. My email is john.doe@company.com, and my credit card number is 4111-1111-1111-1111."     
+        "content": "Hi! Please update my information. My email is john.doe@company.com, and my credit card number is 4111-1111-1111-1111."      
       }
     ]
-  }'`
+  }'
+```
 
 ![1](Screenshots/1.jpg)
 
@@ -119,7 +181,7 @@ I believed for a while that AI/LLM concepts were not yet well integrated with tr
 *   **Named Entity Recognition (NER):** Using spaCy and Microsoft Presidio to detect and redact PII based on sentence syntax.
 *   **LLM Diagnostics:** Identifying how dataset biases and string formatting (like HTML/XML tags) trigger false positives in text classification models.
 *   **Payload Processing:** Controlling the step-by-step processing of incoming JSON payloads and dropping features that introduce too much technical debt.
-*   
+   
 ## Contact
 
 Email: <johnyang4406@gmail.com>, <john_s_yang@brown.edu>
